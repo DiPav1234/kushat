@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="robots" content="noindex,nofollow">
+<title>Ам-ням-ням</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#f1e2bd;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
+#hud{position:fixed;left:0;right:0;top:max(14px,env(safe-area-inset-top));text-align:center;font:800 24px/1.15 "Comic Sans MS","Chalkboard SE","Trebuchet MS",sans-serif;color:#3f6614;pointer-events:none;text-shadow:0 2px 0 #fff8e6}
+#hud small{display:block;margin-top:4px;font-size:15px;font-weight:700;color:#6b5428}
+#hint{position:fixed;left:16px;right:16px;bottom:calc(max(14px,env(safe-area-inset-bottom)) + 8vh);text-align:center;font:700 16px/1.3 "Comic Sans MS","Chalkboard SE","Trebuchet MS",sans-serif;color:#fff8e6;text-shadow:0 1px 3px #5a3d12;pointer-events:none;transition:opacity 1s}
+#snd{position:fixed;right:max(12px,env(safe-area-inset-right));top:max(12px,env(safe-area-inset-top));width:42px;height:42px;border-radius:50%;border:3px solid #2f5a12;background:#9bd043;color:#2f5a12;font:800 18px sans-serif;padding:0;cursor:pointer}
+#snd.off{opacity:.45}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">Ам-ням-ням 💚<small id="score">скушано: 0 · чмоков: 0</small></div>
+<div id="hint">Тапни по ам-няму — подпрыгнет.<br>Тапни мимо — прилетит вкусняшка</div>
+<button id="snd" aria-label="звук">♪</button>
+<script>
+const cv = document.getElementById('c'), cx = cv.getContext('2d');
+const scoreEl = document.getElementById('score'), hintEl = document.getElementById('hint'), sndBtn = document.getElementById('snd');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const GREEN = '#94cf3c', OL = '#22430b', FOL = '#3b2410';
+let W, H, DPR, R, G, floorY, bg, eaten = 0, kisses = 0, shake = 0, time = 0;
+
+function resize() {
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = W * DPR | 0; cv.height = H * DPR | 0;
+  R = Math.max(34, Math.min(95, Math.min(W, H) * 0.12, W * 0.13));
+  G = H * 2.3;
+  floorY = H - Math.max(30, H * 0.07);
+  buildBg(); buildFood();
+  for (const n of noms) { n.x = Math.min(Math.max(n.x, R * 1.1), W - R * 1.1); if (n.ground > 0) n.y = floorY; }
+}
+
+function buildBg() {
+  bg = document.createElement('canvas');
+  bg.width = cv.width; bg.height = cv.height;
+  const b = bg.getContext('2d');
+  b.scale(DPR, DPR);
+  let g = b.createRadialGradient(W / 2, H * 0.35, 0, W / 2, H * 0.35, Math.max(W, H) * 0.85);
+  g.addColorStop(0, '#fff7e2'); g.addColorStop(1, '#ead5a4');
+  b.fillStyle = g; b.fillRect(0, 0, W, H);
+  b.fillStyle = 'rgba(140,100,40,.07)';
+  for (let i = 0; i < W * H / 700; i++) b.fillRect(Math.random() * W, Math.random() * H, 1.4, 1.4);
+  b.strokeStyle = 'rgba(160,120,60,.08)'; b.lineWidth = 1;
+  for (let x = -H; x < W; x += 26) { b.beginPath(); b.moveTo(x, 0); b.lineTo(x + H, H); b.stroke(); }
+  g = b.createLinearGradient(0, floorY, 0, H);
+  g.addColorStop(0, '#c99e5c'); g.addColorStop(1, '#a37a3e');
+  b.fillStyle = g; b.fillRect(0, floorY, W, H - floorY);
+  b.fillStyle = 'rgba(255,240,200,.35)'; b.fillRect(0, floorY + 3, W, 3);
+  b.strokeStyle = '#6e4f22'; b.lineWidth = 3;
+  b.beginPath(); b.moveTo(0, floorY); b.lineTo(W, floorY); b.stroke();
+  b.strokeStyle = 'rgba(90,60,20,.25)'; b.lineWidth = 1.5;
+  for (let x = 40; x < W; x += 90) { b.beginPath(); b.moveTo(x, floorY + 8); b.lineTo(x + 30, floorY + 8); b.stroke(); }
+}
+
+function rr(c, x, y, w, h, r) {
+  c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+function fs(c, fill) { c.fillStyle = fill; c.fill(); c.stroke(); }
+
+const FOOD = {
+  pizza: { col: ['#ffd25a', '#cf3b2c', '#d98b2b'], draw(c) {
+    c.beginPath(); c.moveTo(-0.82, -0.55); c.quadraticCurveTo(0, -0.95, 0.82, -0.55); c.lineTo(0, 0.95); c.closePath(); fs(c, '#ffd25a');
+    c.beginPath(); c.moveTo(0.12, 0.45); c.quadraticCurveTo(0.2, 0.75, 0.1, 0.78); c.quadraticCurveTo(0.02, 0.7, 0.05, 0.6); fs(c, '#ffd25a');
+    for (const [x, y] of [[-0.32, -0.38], [0.3, -0.36], [0, 0.12]]) { c.beginPath(); c.arc(x, y, 0.16, 0, 7); fs(c, '#cf3b2c'); }
+    c.save(); c.beginPath(); c.moveTo(-0.82, -0.55); c.quadraticCurveTo(0, -0.95, 0.82, -0.55);
+    c.lineWidth = 0.34; c.strokeStyle = FOL; c.stroke(); c.lineWidth = 0.2; c.strokeStyle = '#df9338'; c.stroke(); c.restore();
+  } },
+  sushi: { col: ['#fbf7ee', '#ff8656', '#1d3326'], draw(c) {
+    c.beginPath(); c.ellipse(0, 0.28, 0.9, 0.46, 0, 0, 7); fs(c, '#fbf7ee');
+    c.beginPath(); c.moveTo(-0.97, 0.1); c.quadraticCurveTo(-1.02, -0.45, -0.4, -0.48); c.lineTo(0.45, -0.48);
+    c.quadraticCurveTo(1.05, -0.45, 0.97, 0.1); c.quadraticCurveTo(0, -0.12, -0.97, 0.1); fs(c, '#ff8656');
+    c.save(); c.strokeStyle = '#ffd6c2'; c.lineWidth = 0.08;
+    for (const x of [-0.6, -0.25, 0.4, 0.72]) { c.beginPath(); c.moveTo(x - 0.1, -0.38); c.lineTo(x + 0.08, -0.08); c.stroke(); }
+    c.restore();
+    rr(c, -0.17, -0.56, 0.34, 1.26, 0.06); fs(c, '#1d3326');
+  } },
+  candy: { col: ['#ff5fa2', '#ffd23f', '#ffffff'], draw(c) {
+    for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * 0.42, 0); c.lineTo(s * 1.0, -0.45); c.quadraticCurveTo(s * 0.82, 0, s * 1.0, 0.45); c.closePath(); fs(c, '#ffd23f'); }
+    c.beginPath(); c.arc(0, 0, 0.55, 0, 7); fs(c, '#ff5fa2');
+    c.save(); c.strokeStyle = '#fff'; c.lineWidth = 0.1;
+    c.beginPath(); c.arc(0, 0, 0.32, 0.4, 2.8); c.stroke(); c.beginPath(); c.arc(0, 0, 0.32, 3.5, 5.9); c.stroke(); c.restore();
+  } },
+  burger: { col: ['#f0a840', '#6a3a1d', '#6cc04a'], draw(c) {
+    rr(c, -0.85, 0.38, 1.7, 0.4, 0.18); fs(c, '#e3a043');
+    rr(c, -0.93, 0.1, 1.86, 0.32, 0.15); fs(c, '#6a3a1d');
+    c.beginPath(); c.moveTo(-0.92, 0.04); c.lineTo(0.92, 0.04); c.lineTo(0.72, 0.32); c.lineTo(0.52, 0.08); c.lineTo(-0.28, 0.08); c.lineTo(-0.48, 0.34); c.lineTo(-0.68, 0.08); c.closePath(); fs(c, '#ffcc33');
+    c.beginPath(); c.moveTo(-0.98, -0.12);
+    for (let i = 0; i < 6; i++) { const x0 = -0.98 + i * 0.327; c.quadraticCurveTo(x0 + 0.16, 0.14, x0 + 0.327, -0.02); }
+    c.lineTo(0.98, -0.16); c.lineTo(-0.98, -0.16); c.closePath(); fs(c, '#6cc04a');
+    c.beginPath(); c.moveTo(-0.9, -0.12); c.bezierCurveTo(-0.9, -0.98, 0.9, -0.98, 0.9, -0.12); c.closePath(); fs(c, '#f0a840');
+    c.save(); c.fillStyle = '#fff4d6'; c.lineWidth = 0.03;
+    for (const [x, y, a] of [[-0.45, -0.45, 0.5], [-0.1, -0.62, -0.3], [0.3, -0.5, 0.8], [0.55, -0.3, 0.1], [-0.6, -0.25, -0.6], [0.1, -0.32, 0.3]]) { c.beginPath(); c.ellipse(x, y, 0.07, 0.04, a, 0, 7); c.fill(); c.stroke(); }
+    c.restore();
+  } },
+  fries: { col: ['#ffd640', '#d9271f', '#ffcc1f'], draw(c) {
+    c.save(); c.lineWidth = 0.08;
+    for (const [x, y, a] of [[-0.42, -0.72, -0.18], [-0.18, -0.95, -0.06], [0.06, -0.82, 0.05], [0.3, -0.98, 0.12], [0.48, -0.7, 0.24], [-0.02, -1.02, 0]]) {
+      c.save(); c.translate(x, y + 0.45); c.rotate(a); rr(c, -0.08, -0.45, 0.16, 0.9, 0.04); fs(c, '#ffd640'); c.restore();
+    }
+    c.restore();
+    c.beginPath(); c.moveTo(-0.66, -0.3); c.quadraticCurveTo(0, -0.05, 0.66, -0.3); c.lineTo(0.48, 0.95); c.lineTo(-0.48, 0.95); c.closePath(); fs(c, '#d9271f');
+    c.save(); c.strokeStyle = '#ffcc1f'; c.lineWidth = 0.11;
+    c.beginPath(); c.moveTo(-0.3, 0.68); c.bezierCurveTo(-0.3, 0.18, -0.04, 0.18, 0, 0.48); c.bezierCurveTo(0.04, 0.18, 0.3, 0.18, 0.3, 0.68); c.stroke(); c.restore();
+  } },
+  nuggets: { col: ['#e2a245', '#c27f2a', '#f3c26b'], draw(c) {
+    for (const [x, y, rx, ry, a] of [[-0.45, 0.25, 0.44, 0.34, -0.3], [0.42, 0.3, 0.42, 0.33, 0.4], [0, -0.28, 0.47, 0.35, 0.1]]) {
+      c.save(); c.translate(x, y); c.rotate(a);
+      c.beginPath(); c.moveTo(-rx, 0); c.bezierCurveTo(-rx, -ry * 1.2, rx * 0.4, -ry * 1.1, rx, -ry * 0.2); c.bezierCurveTo(rx * 1.1, ry, -rx * 0.3, ry * 1.2, -rx, 0); fs(c, '#e2a245');
+      c.fillStyle = '#c27f2a';
+      for (const [px, py] of [[-0.15, -0.1], [0.12, 0.08], [0.2, -0.12], [-0.05, 0.15]]) { c.beginPath(); c.arc(px, py, 0.035, 0, 7); c.fill(); }
+      c.restore();
+    }
+  } },
+  cola: { col: ['#d9271f', '#ffffff', '#3a1a0e'], draw(c) {
+    c.save(); c.lineWidth = 0.2; c.beginPath(); c.moveTo(0.1, -0.7); c.lineTo(0.32, -1.08); c.stroke();
+    c.strokeStyle = '#ff5a5a'; c.lineWidth = 0.1; c.stroke(); c.restore();
+    c.beginPath(); c.moveTo(-0.56, -0.55); c.lineTo(0.56, -0.55); c.lineTo(0.42, 0.95); c.lineTo(-0.42, 0.95); c.closePath(); fs(c, '#d9271f');
+    c.save(); c.lineWidth = 0.04;
+    c.beginPath(); c.moveTo(-0.52, 0.0); c.bezierCurveTo(-0.2, -0.22, 0.12, 0.3, 0.5, -0.04); c.lineTo(0.48, 0.14); c.bezierCurveTo(0.1, 0.46, -0.2, -0.02, -0.5, 0.18); c.closePath(); fs(c, '#fff');
+    c.restore();
+    rr(c, -0.66, -0.72, 1.32, 0.22, 0.08); fs(c, '#f4f4f4');
+  } },
+};
+const FOOD_TYPES = Object.keys(FOOD);
+const sprites = {};
+let FS;
+function buildFood() {
+  FS = R * 0.56;
+  for (const k of FOOD_TYPES) {
+    const size = Math.ceil(FS * 2.6 * DPR), s = document.createElement('canvas');
+    s.width = s.height = size;
+    const c = s.getContext('2d');
+    c.translate(size / 2, size / 2); c.scale(FS * DPR, FS * DPR);
+    c.lineJoin = c.lineCap = 'round'; c.lineWidth = 0.11; c.strokeStyle = FOL;
+    FOOD[k].draw(c);
+    sprites[k] = s;
+  }
+}
+
+const noms = [mkNom('b', 0.33), mkNom('g', 0.67)];
+function mkNom(kind, fx) {
+  return { kind, fx, x: innerWidth * fx, y: 0, vx: 0, vy: 0, sq: 0, sqv: 0, ground: 0.3 + fx, eat: 0, mouth: 0, blink: 0, blinkT: 1 + Math.random() * 3,
+    lx: 0, ly: 0, lean: 0, kiss: 0, ant: 0, antv: 0, target: null, chewed: 0 };
+}
+const foods = [], parts = [], hearts = [], texts = [];
+let spawnT = 0.4, kissT = 0, kissCd = 2, kissDir = 1, kissX = 0, kissY = 0, heartDone = false;
+
+function spawnFood(x, y, vy) {
+  const t = FOOD_TYPES[Math.random() * FOOD_TYPES.length | 0];
+  foods.push({ t, x: x ?? FS * 1.5 + Math.random() * (W - FS * 3), y: y ?? -FS * 1.5, vx: 0, vy: vy ?? H * (0.1 + Math.random() * 0.08),
+    rot: Math.random() * 6, vr: (Math.random() - 0.5) * 2.5, ph: Math.random() * 6, st: 'fall', life: 2.2 });
+}
+
+const mouthOff = () => R * 0.62;
+function mouthPos(n) { return [n.x, n.y - mouthOff() * (1 - n.sq)]; }
+
+function plan(n, f) {
+  let h = floorY - mouthOff() - f.y, T = 0;
+  for (let i = 0; i < 5; i++) {
+    h = Math.max(R * 0.4, h);
+    T = Math.sqrt(2 * h / G);
+    h = floorY - mouthOff() - (f.y + f.vy * T);
+  }
+  h = Math.max(R * 0.4, h);
+  if (h > floorY - R * 2.6) return null;
+  T = Math.sqrt(2 * h / G);
+  const vx = (f.x - n.x) / T;
+  if (Math.abs(vx) > W * 0.9 + R * 6) return null;
+  return { h, T, vx };
+}
+
+function launch(n) {
+  const o = noms[0] === n ? noms[1] : noms[0];
+  let best = null, bs = -1e9;
+  for (const f of foods) {
+    if (f.st !== 'fall') continue;
+    const p = plan(n, f);
+    if (!p) continue;
+    const sc = -p.T - Math.abs(p.vx) / (W * 3) - (o.target === f ? 0.6 : 0);
+    if (sc > bs) { bs = sc; best = { f, p }; }
+  }
+  let h, vx;
+  if (best) { n.target = best.f; h = best.p.h; vx = best.p.vx * (0.96 + Math.random() * 0.08); }
+  else { n.target = null; h = R * (0.8 + Math.random() * 2.2); vx = (Math.random() - 0.5) * W * 0.5 + (W / 2 - n.x) * 0.4; }
+  n.vy = -Math.sqrt(2 * G * h); n.vx = vx; n.ground = 0;
+  n.sqv -= 6;
+}
+
+function catchFood(n, f) {
+  f.st = 'gone'; eaten++; n.eat = 1.25; n.chewed = 0;
+  const [mx, my] = mouthPos(n);
+  const col = FOOD[f.t].col;
+  for (let i = 0; i < 10; i++) parts.push({ x: mx, y: my, vx: (Math.random() - 0.5) * R * 6, vy: -Math.random() * R * 5, life: 0.6 + Math.random() * 0.4, c: col[i % col.length], s: R * (0.05 + Math.random() * 0.05) });
+  texts.push({ x: mx + (Math.random() - 0.5) * R, y: my - R * 1.6, life: 0.9, t: Math.random() < 0.5 ? 'ам!' : 'ням!' });
+  sfx.am(); updScore();
+}
+
+function updScore() { scoreEl.textContent = `скушано: ${eaten} · чмоков: ${kisses}`; }
+
+function wallHit() { if (!reduce) shake = Math.min(shake + R * 0.16, R * 0.3); sfx.wall(); }
+
+function updNom(n, dt) {
+  const o = noms[0] === n ? noms[1] : noms[0];
+  if (kissT > 0) {
+    const side = n === noms[0] ? -kissDir : kissDir;
+    const tx = kissX + side * R * 0.9;
+    n.x += (tx - n.x) * Math.min(1, dt * 10);
+    n.y += (kissY - n.y) * Math.min(1, dt * 8);
+    n.lean += (-side * 0.2 - n.lean) * Math.min(1, dt * 10);
+    n.kiss = Math.min(1, n.kiss + dt * 5);
+  } else {
+    n.kiss = Math.max(0, n.kiss - dt * 3);
+    n.lean += (Math.max(-0.12, Math.min(0.12, n.vx / (W * 4))) - n.lean) * Math.min(1, dt * 6);
+    if (n.ground > 0) {
+      n.y = floorY; n.ground -= dt;
+      if (n.ground <= 0) launch(n);
+    } else {
+      if (n.target && n.target.st === 'fall') {
+        const want = (n.target.x - n.x) * 2.2;
+        n.vx += (want - n.vx) * Math.min(1, dt * 1.2);
+      }
+      n.vy += G * dt; n.x += n.vx * dt; n.y += n.vy * dt;
+      const m = R * 1.02;
+      if (n.x < m) { n.x = m; n.vx = Math.abs(n.vx) * 0.85 + R; n.target = null; wallHit(); }
+      if (n.x > W - m) { n.x = W - m; n.vx = -Math.abs(n.vx) * 0.85 - R; n.target = null; wallHit(); }
+      if (n.y < R * 2.4) { n.y = R * 2.4; n.vy = Math.abs(n.vy) * 0.3; }
+      if (n.y >= floorY && n.vy > 0) {
+        n.sqv += Math.min(14, n.vy / (H * 0.12)); n.y = floorY; n.vy = 0; n.vx *= 0.2;
+        n.ground = 0.07 + Math.random() * 0.1; sfx.land();
+      }
+    }
+  }
+  const tgt = n.ground > 0 ? 0.17 : kissT > 0 ? 0 : -Math.min(Math.abs(n.vy) / (G * 1.2), 0.08);
+  n.sqv += ((tgt - n.sq) * 220 - n.sqv * 13) * dt; n.sq += n.sqv * dt;
+  n.sq = Math.max(-0.15, Math.min(0.3, n.sq));
+  n.antv += ((-n.vx / (W * 3) + n.vy / (G * 2)) * 0.5 - n.ant) * 120 * dt - n.antv * 6 * dt; n.ant += n.antv * dt;
+
+  const [mx, my] = mouthPos(n);
+  let near = null, nd = 1e9;
+  for (const f of foods) {
+    if (f.st === 'gone') continue;
+    const d = Math.hypot(f.x - mx, f.y - my);
+    if (d < nd) { nd = d; near = f; }
+    if (d < R * 0.55 + FS * 0.6 && n.eat < 0.9 && kissT <= 0) catchFood(n, f);
+  }
+  let mt = 0;
+  if (n.eat > 0) {
+    n.eat -= dt;
+    const ph = 1.25 - n.eat;
+    if (ph < 0.12) mt = 1;
+    else { mt = 0.42 * Math.abs(Math.sin((ph - 0.12) * 15)) * Math.min(1, n.eat * 2); const c = Math.floor((ph - 0.12) * 15 / Math.PI); if (c > n.chewed && c < 5) { n.chewed = c; sfx.chew(); } }
+  } else if (near && nd < R * 3.2 && kissT <= 0) mt = 0.85 * (1 - nd / (R * 3.2));
+  n.mouth += (mt - n.mouth) * Math.min(1, dt * (mt > n.mouth ? 25 : 12));
+
+  let lx = 0, ly = 0;
+  const look = kissT > 0 ? [o.x, o.y - R] : near ? [near.x, near.y] : [o.x, o.y - R];
+  const dx = look[0] - n.x, dy = look[1] - (n.y - R * 1.1), dl = Math.hypot(dx, dy) || 1;
+  lx = dx / dl; ly = dy / dl;
+  n.lx += (lx - n.lx) * Math.min(1, dt * 8); n.ly += (ly - n.ly) * Math.min(1, dt * 8);
+
+  n.blinkT -= dt;
+  if (n.blinkT < 0) { n.blink = 1; n.blinkT = 2 + Math.random() * 4; }
+  n.blink = Math.max(0, n.blink - dt * 7);
+}
+
+function updKiss(dt) {
+  const [a, b] = noms;
+  kissCd -= dt;
+  if (kissT > 0) {
+    kissT -= dt;
+    if (!heartDone && kissT < 1.05) {
+      heartDone = true; kisses++; updScore(); sfx.kiss();
+      hearts.push({ x: kissX, y: kissY - R * 1.6, vy: -R * 1.3, s: 0, life: 2, big: true });
+      for (let i = 0; i < 6; i++) hearts.push({ x: kissX + (Math.random() - 0.5) * R * 2, y: kissY - R * (1 + Math.random()), vy: -R * (1 + Math.random()), vx: (Math.random() - 0.5) * R * 2, s: 0, life: 1 + Math.random() * 0.8 });
+    }
+    if (kissT <= 0) {
+      for (const n of [a, b]) {
+        const side = n === a ? -kissDir : kissDir;
+        n.vx = side * W * (0.25 + Math.random() * 0.15); n.vy = -Math.sqrt(2 * G * R * (2 + Math.random() * 1.5)); n.ground = 0; n.target = null;
+      }
+      kissCd = 4 + Math.random() * 2;
+    }
+    return;
+  }
+  const ay = a.y - R * 0.9 * (1 - a.sq), by = b.y - R * 0.9 * (1 - b.sq);
+  const d = Math.hypot(a.x - b.x, ay - by);
+  if (d < R * 1.9) {
+    if (kissCd <= 0) {
+      kissT = 1.4; heartDone = false;
+      kissDir = a.x < b.x ? 1 : -1;
+      kissX = (a.x + b.x) / 2; kissX = Math.min(Math.max(kissX, R * 2), W - R * 2);
+      kissY = Math.min(floorY, Math.max(R * 3, (a.y + b.y) / 2));
+      for (const n of [a, b]) { n.vx = 0; n.vy = 0; n.ground = 0; }
+    } else {
+      const s = a.x < b.x ? -1 : 1, push = (R * 1.9 - d) / 2;
+      a.x += s * push; b.x -= s * push;
+      if (Math.sign(a.vx - b.vx) === -s) { const t = a.vx; a.vx = b.vx; b.vx = t; }
+    }
+  }
+}
+
+function updFood(dt) {
+  spawnT -= dt;
+  if (spawnT <= 0) { if (foods.filter(f => f.st === 'fall').length < 8) spawnFood(); spawnT = 0.55 + Math.random() * 0.6; }
+  for (const f of foods) {
+    if (f.st === 'fall') {
+      f.vy = Math.min(f.vy + G * 0.08 * dt, H * 0.3);
+      f.x += (f.vx + Math.sin(time * 1.6 + f.ph) * R * 0.5) * dt; f.y += f.vy * dt; f.rot += f.vr * dt;
+      f.vx *= 0.98;
+      f.x = Math.min(Math.max(f.x, FS), W - FS);
+      if (f.y >= floorY - FS * 0.75) { f.y = floorY - FS * 0.75; f.st = 'floor'; f.vr = 0; }
+    } else if (f.st === 'floor') {
+      f.life -= dt;
+      if (f.life <= 0) f.st = 'gone';
+    }
+  }
+  for (let i = foods.length - 1; i >= 0; i--) if (foods[i].st === 'gone') foods.splice(i, 1);
+}
+
+function updFx(dt) {
+  for (const p of parts) { p.vy += G * 0.6 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
+  for (const h of hearts) { h.y += h.vy * dt; h.x += (h.vx || 0) * dt + Math.sin(time * 3 + h.life * 5) * R * 0.2 * dt; h.s = Math.min(1, h.s + dt * 4); h.life -= dt; }
+  for (const t of texts) { t.y -= R * 1.2 * dt; t.life -= dt; }
+  for (const arr of [parts, hearts, texts]) for (let i = arr.length - 1; i >= 0; i--) if (arr[i].life <= 0) arr.splice(i, 1);
+  shake = Math.max(0, shake - dt * R * 1.6);
+}
+
+function heart(c, x, y, s) {
+  c.beginPath(); c.moveTo(x, y + s * 0.35);
+  c.bezierCurveTo(x - s * 1.05, y - s * 0.35, x - s * 0.5, y - s * 1.1, x, y - s * 0.45);
+  c.bezierCurveTo(x + s * 0.5, y - s * 1.1, x + s * 1.05, y - s * 0.35, x, y + s * 0.35);
+}
+
+function bodyPath(c) {
+  c.beginPath(); c.moveTo(0, -1.72);
+  c.bezierCurveTo(0.78, -1.72, 1.1, -1.25, 1.1, -0.78);
+  c.bezierCurveTo(1.1, -0.3, 0.98, -0.03, 0.64, 0);
+  c.lineTo(-0.64, 0);
+  c.bezierCurveTo(-0.98, -0.03, -1.1, -0.3, -1.1, -0.78);
+  c.bezierCurveTo(-1.1, -1.25, -0.78, -1.72, 0, -1.72);
+  c.closePath();
+}
+
+const EX = 0.41, EY = -1.12, ER = 0.35;
+function eye(c, n, s) {
+  const x = s * EX, girl = n.kind === 'g';
+  const closed = n.kiss > 0.5 ? 1 : n.blink;
+  c.beginPath(); c.arc(x, EY, ER, 0, 7); c.fillStyle = '#fff'; c.fill();
+  if (closed < 0.95) {
+    const px = x + n.lx * 0.12, py = EY + n.ly * 0.12;
+    if (girl) {
+      c.beginPath(); c.arc(px, py, 0.17, 0, 7); c.fillStyle = '#2f5fc4'; c.fill();
+      c.lineWidth = 0.035; c.strokeStyle = '#173478'; c.stroke();
+      c.beginPath(); c.arc(px, py, 0.085, 0, 7); c.fillStyle = '#0b0f1e'; c.fill();
+    } else {
+      c.beginPath(); c.arc(px, py, 0.13, 0, 7); c.fillStyle = '#0d0d0d'; c.fill();
+    }
+    c.beginPath(); c.arc(px + 0.05, py - 0.06, 0.045, 0, 7); c.fillStyle = '#fff'; c.fill();
+  }
+  if (closed > 0.02) {
+    c.save(); c.beginPath(); c.arc(x, EY, ER, 0, 7); c.clip();
+    c.fillStyle = GREEN; c.fillRect(x - ER, EY - ER, ER * 2, ER * 2 * Math.min(1, closed));
+    c.restore();
+    if (closed >= 0.95) {
+      c.beginPath(); c.arc(x, EY - 0.08, 0.2, 0.25, Math.PI - 0.25);
+      c.lineWidth = 0.06; c.strokeStyle = OL; c.stroke();
+    }
+  }
+  c.beginPath(); c.arc(x, EY, ER, 0, 7); c.lineWidth = 0.065; c.strokeStyle = OL; c.stroke();
+  if (girl) {
+    c.lineWidth = 0.085; c.strokeStyle = '#111';
+    c.beginPath(); c.moveTo(x + s * 0.22, EY - 0.28); c.quadraticCurveTo(x + s * 0.36, EY - 0.3, x + s * 0.47, EY - 0.42); c.stroke();
+    c.beginPath(); c.moveTo(x + s * 0.3, EY - 0.2); c.quadraticCurveTo(x + s * 0.42, EY - 0.2, x + s * 0.52, EY - 0.28); c.stroke();
+  }
+}
+
+function boyHair(c) {
+  c.beginPath();
+  const N = 15;
+  for (let i = 0; i <= N; i++) {
+    const a = Math.PI * (1.02 + 0.98 * i / N), out = i % 2 ? 1.12 : 0.94;
+    const x = Math.cos(a) * out, y = -1.28 + Math.sin(a) * (i % 2 ? 0.72 : 0.56);
+    i ? c.lineTo(x, y) : c.moveTo(x, y);
+  }
+  const fr = [[0.95, -1.36], [0.7, -1.44], [0.62, -1.3], [0.42, -1.48], [0.26, -1.34], [0.08, -1.5], [-0.12, -1.33], [-0.3, -1.5], [-0.5, -1.32], [-0.66, -1.47], [-0.84, -1.2], [-0.98, -1.25]];
+  for (const [x, y] of fr) c.lineTo(x, y);
+  c.closePath();
+  c.fillStyle = '#7a4a24'; c.fill(); c.lineWidth = 0.065; c.strokeStyle = '#3a220f'; c.stroke();
+  c.strokeStyle = '#a3693a'; c.lineWidth = 0.045;
+  for (const [x0, y0, x1, y1] of [[-0.55, -1.62, -0.3, -1.85], [-0.15, -1.7, 0.1, -1.92], [0.25, -1.65, 0.48, -1.82], [-0.75, -1.5, -0.62, -1.62]]) { c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); }
+}
+
+function glasses(c) {
+  c.lineWidth = 0.1; c.strokeStyle = '#141414'; c.fillStyle = 'rgba(210,235,255,.13)';
+  for (const s of [-1, 1]) { rr(c, s * EX - 0.4, EY - 0.34, 0.8, 0.68, 0.2); c.fill(); c.stroke(); }
+  c.beginPath(); c.moveTo(-0.81, EY - 0.1); c.lineTo(-1.02, EY - 0.04); c.moveTo(0.81, EY - 0.1); c.lineTo(1.02, EY - 0.04); c.stroke();
+}
+
+function girlBackHair(c) {
+  c.beginPath(); c.moveTo(0, -1.97);
+  c.bezierCurveTo(0.95, -1.97, 1.22, -1.3, 1.17, -0.28);
+  c.quadraticCurveTo(1.02, -0.12, 0.86, -0.3);
+  c.lineTo(-0.86, -0.4);
+  c.quadraticCurveTo(-1.02, -0.22, -1.14, -0.45);
+  c.bezierCurveTo(-1.2, -1.3, -0.95, -1.97, 0, -1.97);
+  c.closePath();
+  c.fillStyle = '#d9b578'; c.fill(); c.lineWidth = 0.065; c.strokeStyle = '#8a6430'; c.stroke();
+}
+
+function girlFrontHair(c) {
+  c.beginPath(); c.moveTo(-0.95, -1.18);
+  c.bezierCurveTo(-0.95, -1.78, -0.3, -1.98, 0.25, -1.88);
+  c.bezierCurveTo(0.88, -1.78, 1.18, -1.2, 1.12, -0.3);
+  c.quadraticCurveTo(1.02, -0.18, 0.93, -0.32);
+  c.bezierCurveTo(0.98, -0.9, 0.86, -1.36, 0.5, -1.5);
+  c.bezierCurveTo(0.12, -1.66, -0.42, -1.5, -0.95, -1.18);
+  c.closePath();
+  const g = c.createLinearGradient(0, -1.95, 0, -0.3);
+  g.addColorStop(0, '#f3d79e'); g.addColorStop(1, '#ddb675');
+  c.fillStyle = g; c.fill(); c.lineWidth = 0.065; c.strokeStyle = '#8a6430'; c.stroke();
+  c.lineWidth = 0.035; c.strokeStyle = '#b8904f';
+  for (const [a, b, d, e, f, h] of [[-0.6, -1.4, -0.1, -1.75, 0.45, -1.78], [-0.2, -1.55, 0.3, -1.72, 0.8, -1.5], [0.7, -1.62, 1.0, -1.2, 1.02, -0.5]]) { c.beginPath(); c.moveTo(a, b); c.quadraticCurveTo(d, e, f, h); c.stroke(); }
+  c.strokeStyle = '#fbe9c4'; c.lineWidth = 0.045;
+  c.beginPath(); c.moveTo(-0.45, -1.6); c.quadraticCurveTo(-0.1, -1.82, 0.3, -1.8); c.stroke();
+}
+
+function bow(c) {
+  c.save(); c.translate(0.18, -1.84); c.rotate(-0.25);
+  c.lineWidth = 0.05; c.strokeStyle = '#b44a76';
+  for (const s of [-1, 1]) { c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(s * 0.24, -0.3, s * 0.34, -0.03); c.quadraticCurveTo(s * 0.26, 0.24, 0, 0); fs(c, '#f7a1c4'); }
+  c.beginPath(); c.arc(0, 0, 0.08, 0, 7); fs(c, '#f48bb6');
+  c.restore();
+}
+
+function necklace(c) {
+  c.lineWidth = 0.032; c.strokeStyle = '#c3c9d2';
+  c.beginPath(); c.moveTo(-0.52, -0.56); c.quadraticCurveTo(-0.15, -0.26, 0.04, -0.27); c.quadraticCurveTo(0.26, -0.3, 0.56, -0.6); c.stroke();
+  c.fillStyle = '#fff'; c.lineWidth = 0.018; c.strokeStyle = '#8f96a0';
+  for (const [x, y] of [[0, -0.055], [0, 0.055], [-0.055, 0], [0.055, 0]]) { c.beginPath(); c.arc(0.04 + x, -0.2 + y, 0.05, 0, 7); c.fill(); c.stroke(); }
+}
+
+function q(t, p0, p1, p2) { const u = 1 - t; return u * u * p0 + 2 * u * t * p1 + t * t * p2; }
+function mouth(c, n, side) {
+  if (n.kiss > 0.5) {
+    c.beginPath(); c.ellipse(side * 0.3, -0.68, 0.13, 0.11, 0, 0, 7);
+    c.fillStyle = '#d8506a'; c.fill(); c.lineWidth = 0.055; c.strokeStyle = OL; c.stroke();
+    c.beginPath(); c.moveTo(side * 0.3 - 0.07, -0.68); c.lineTo(side * 0.3 + 0.07, -0.68); c.lineWidth = 0.03; c.stroke();
+    return;
+  }
+  const m = n.mouth, L = -0.64, Rx = 0.64, Y = -0.74, CU = -0.47, CL = -0.47 + m * 0.75;
+  c.beginPath(); c.moveTo(L, Y); c.quadraticCurveTo(0, CU, Rx, Y); c.quadraticCurveTo(0, CL, L, Y); c.closePath();
+  if (m > 0.03) {
+    c.fillStyle = '#5e1019'; c.fill();
+    c.save(); c.clip();
+    c.beginPath(); c.ellipse(0, q(0.5, Y, CL, Y) - 0.02, 0.32, 0.17, 0, 0, 7); c.fillStyle = '#e8687c'; c.fill();
+    c.restore();
+  }
+  c.lineWidth = 0.07; c.strokeStyle = OL; c.stroke();
+  c.lineWidth = 0.035; c.fillStyle = '#fff';
+  for (const t of [0.17, 0.35, 0.65, 0.83]) {
+    const xa = q(t - 0.065, L, 0, Rx), ya = q(t - 0.065, Y, CU, Y), xb = q(t + 0.065, L, 0, Rx), yb = q(t + 0.065, Y, CU, Y);
+    const xt = q(t, L, 0, Rx), yt = q(t, Y, CU, Y) + 0.17;
+    c.beginPath(); c.moveTo(xa, ya); c.lineTo(xt, yt); c.lineTo(xb, yb); c.closePath(); c.fill(); c.stroke();
+  }
+}
+
+function drawNom(n) {
+  const c = cx, girl = n.kind === 'g';
+  const o = noms[0] === n ? noms[1] : noms[0];
+  const side = o.x > n.x ? 1 : -1;
+  const hgt = Math.max(0, floorY - n.y), sh = Math.max(0.25, 1 - hgt / (H * 0.7));
+  c.save(); c.globalAlpha = 0.22 * sh; c.fillStyle = '#4a3010';
+  c.beginPath(); c.ellipse(n.x, floorY + 2, R * 0.95 * sh * (1 + n.sq), R * 0.18 * sh, 0, 0, 7); c.fill(); c.restore();
+
+  c.save();
+  c.translate(n.x, n.y); c.rotate(n.lean);
+  const cheek = n.eat > 0 && n.eat < 1.13 ? 0.05 : 0;
+  c.scale(R * (1 + n.sq + cheek), R * (1 - n.sq));
+  c.lineJoin = c.lineCap = 'round';
+
+  c.save(); c.translate(0, -1.6); c.rotate(n.ant);
+  const stalk = () => { c.beginPath(); c.moveTo(0, 0.05); c.quadraticCurveTo(-0.1, -0.42, 0.12, -0.62); };
+  stalk(); c.lineWidth = 0.28; c.strokeStyle = OL; c.stroke();
+  stalk(); c.lineWidth = 0.15; c.strokeStyle = GREEN; c.stroke();
+  c.beginPath(); c.ellipse(0.2, -0.68, 0.16, 0.115, -0.6, 0, 7); c.fillStyle = GREEN; c.fill(); c.lineWidth = 0.065; c.strokeStyle = OL; c.stroke();
+  c.restore();
+
+  if (girl) girlBackHair(c);
+
+  bodyPath(c);
+  const g = c.createLinearGradient(0, -1.75, 0, 0);
+  g.addColorStop(0, '#addf52'); g.addColorStop(1, '#78b82a');
+  c.fillStyle = g; c.fill();
+  c.save(); c.clip();
+  c.fillStyle = 'rgba(40,90,10,.18)'; c.beginPath(); c.ellipse(0.25, 0.15, 1.1, 0.42, 0, 0, 7); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.28)'; c.beginPath(); c.ellipse(-0.55, -1.3, 0.22, 0.13, -0.7, 0, 7); c.fill();
+  c.restore();
+  c.lineWidth = 0.075; c.strokeStyle = OL; bodyPath(c); c.stroke();
+
+  for (const s of [-1, 1]) { c.beginPath(); c.ellipse(s * 0.5, -0.02, 0.27, 0.1, 0, 0, 7); c.fillStyle = '#86c434'; c.fill(); c.lineWidth = 0.065; c.stroke(); }
+
+  if (n.kiss > 0) {
+    c.save(); c.globalAlpha = 0.6 * n.kiss; c.fillStyle = '#ff7a98';
+    for (const s of [-1, 1]) { c.beginPath(); c.ellipse(s * 0.66, -0.78, 0.15, 0.08, 0, 0, 7); c.fill(); }
+    c.restore();
+  }
+
+  if (!girl) boyHair(c);
+  eye(c, n, -1); eye(c, n, 1);
+  if (!girl) glasses(c);
+  if (girl) necklace(c);
+  mouth(c, n, side);
+  if (girl) { girlFrontHair(c); bow(c); }
+  c.restore();
+}
+
+function drawFood(f) {
+  const s = sprites[f.t], sz = FS * 2.6;
+  cx.save();
+  cx.translate(f.x, f.y); cx.rotate(f.st === 'floor' ? 0 : Math.sin(f.rot) * 0.5);
+  if (f.st === 'floor') cx.globalAlpha = Math.min(1, f.life * 2);
+  cx.drawImage(s, -sz / 2, -sz / 2, sz, sz);
+  cx.restore();
+}
+
+function draw() {
+  cx.setTransform(1, 0, 0, 1, 0, 0);
+  cx.fillStyle = '#ead5a4'; cx.fillRect(0, 0, cv.width, cv.height);
+  const sx = shake ? (Math.random() - 0.5) * 2 * shake : 0, sy = shake ? (Math.random() - 0.5) * 2 * shake : 0;
+  cx.setTransform(DPR, 0, 0, DPR, sx * DPR, sy * DPR);
+  cx.drawImage(bg, 0, 0, W, H);
+  for (const f of foods) if (f.st === 'floor') drawFood(f);
+  for (const n of noms) drawNom(n);
+  for (const f of foods) if (f.st === 'fall') drawFood(f);
+  for (const p of parts) { cx.globalAlpha = Math.min(1, p.life * 2); cx.fillStyle = p.c; cx.fillRect(p.x - p.s, p.y - p.s, p.s * 2, p.s * 2); }
+  cx.globalAlpha = 1;
+  cx.lineWidth = Math.max(1.5, R * 0.04); cx.strokeStyle = '#a3123c';
+  for (const h of hearts) {
+    const s = (h.big ? R * 0.75 : R * 0.28) * (0.6 + 0.4 * h.s) * (h.big ? 1 + 0.08 * Math.sin(time * 10) : 1);
+    cx.globalAlpha = Math.min(1, h.life * 1.5);
+    heart(cx, h.x, h.y, s); cx.fillStyle = h.big ? '#ff3d6e' : '#ff7fa3'; cx.fill(); cx.stroke();
+  }
+  cx.globalAlpha = 1;
+  cx.textAlign = 'center'; cx.font = `800 ${Math.round(R * 0.45)}px "Comic Sans MS","Chalkboard SE","Trebuchet MS",sans-serif`;
+  for (const t of texts) {
+    cx.globalAlpha = Math.min(1, t.life * 2);
+    cx.lineWidth = R * 0.1; cx.strokeStyle = '#fff8e6'; cx.strokeText(t.t, t.x, t.y);
+    cx.fillStyle = '#4f8a14'; cx.fillText(t.t, t.x, t.y);
+  }
+  cx.globalAlpha = 1;
+}
+
+let last = performance.now();
+function frame(now) {
+  let dt = Math.min(0.033, (now - last) / 1000); last = now;
+  if (reduce) dt *= 0.6;
+  time += dt;
+  updFood(dt);
+  for (const n of noms) updNom(n, dt);
+  updKiss(dt);
+  updFx(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+
+let AC = null, muted = false;
+function unlock() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (AC && AC.state === 'suspended') AC.resume();
+}
+function tone(f0, f1, dur, type, vol, delay = 0) {
+  if (!AC || muted) return;
+  const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(AC.destination); o.start(t); o.stop(t + dur + 0.03);
+}
+const sfx = {
+  am() { tone(560, 260, 0.14, 'triangle', 0.13); tone(320, 180, 0.1, 'square', 0.03, 0.04); },
+  chew() { tone(190, 120, 0.06, 'triangle', 0.06); },
+  land() { tone(150, 300, 0.1, 'sine', 0.035); },
+  jump() { tone(220, 760, 0.25, 'sine', 0.09); },
+  wall() { tone(130, 70, 0.13, 'triangle', 0.12); },
+  kiss() { tone(1400, 900, 0.06, 'sine', 0.1); tone(1650, 1050, 0.07, 'sine', 0.1, 0.1); },
+};
+
+let hinted = false;
+cv.addEventListener('pointerdown', e => {
+  unlock();
+  if (!hinted) { hinted = true; hintEl.style.opacity = 0; }
+  const x = e.clientX, y = e.clientY;
+  for (const n of noms) {
+    if (Math.abs(x - n.x) < R * 1.2 && y > n.y - R * 2.1 && y < n.y + R * 0.3) {
+      if (kissT > 0) return;
+      n.ground = 0; n.vy = -Math.sqrt(2 * G * Math.min(H * 0.6, floorY - R * 3)); n.vx = (W / 2 - n.x) * 0.5 + (Math.random() - 0.5) * W * 0.3;
+      n.sqv -= 8; n.target = null; sfx.jump();
+      return;
+    }
+  }
+  spawnFood(Math.min(Math.max(x, FS), W - FS), Math.min(y, floorY - FS * 2), -H * 0.25);
+});
+sndBtn.addEventListener('pointerdown', e => { e.stopPropagation(); unlock(); muted = !muted; sndBtn.classList.toggle('off', muted); });
+setTimeout(() => { if (!hinted) hintEl.style.opacity = 0; }, 9000);
+
+addEventListener('resize', resize);
+resize();
+for (const n of noms) { n.x = W * n.fx; n.y = floorY; }
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
