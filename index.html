@@ -24,7 +24,7 @@ canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
 const cv = document.getElementById('c'), cx = cv.getContext('2d');
 const scoreEl = document.getElementById('score'), hintEl = document.getElementById('hint'), sndBtn = document.getElementById('snd');
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const GREEN = '#94cf3c', OL = '#22430b', FOL = '#3b2410';
+const GREEN = '#94cf3c', OL = '#33621a', FOL = '#3b2410';
 let W, H, DPR, R, G, floorY, bg, eaten = 0, kisses = 0, shake = 0, time = 0;
 
 function resize() {
@@ -256,9 +256,9 @@ function updNom(n, dt) {
   if (n.eat > 0) {
     n.eat -= dt;
     const ph = 1.25 - n.eat;
-    if (ph < 0.12) mt = 1;
-    else { mt = 0.42 * Math.abs(Math.sin((ph - 0.12) * 15)) * Math.min(1, n.eat * 2); const c = Math.floor((ph - 0.12) * 15 / Math.PI); if (c > n.chewed && c < 5) { n.chewed = c; sfx.chew(); } }
-  } else if (near && nd < R * 3.2 && kissT <= 0) mt = 0.85 * (1 - nd / (R * 3.2));
+    if (ph < 0.12) mt = 0.85;
+    else { mt = 0.35 * Math.abs(Math.sin((ph - 0.12) * 15)) * Math.min(1, n.eat * 2); const c = Math.floor((ph - 0.12) * 15 / Math.PI); if (c > n.chewed && c < 5) { n.chewed = c; sfx.chew(); } }
+  } else if (near && nd < R * 3.2 && kissT <= 0) mt = 0.55 * (1 - nd / (R * 3.2));
   n.mouth += (mt - n.mouth) * Math.min(1, dt * (mt > n.mouth ? 25 : 12));
 
   let lx = 0, ly = 0;
@@ -356,15 +356,15 @@ function eye(c, n, s) {
   const closed = n.kiss > 0.5 ? 1 : n.blink;
   c.beginPath(); c.arc(x, EY, ER, 0, 7); c.fillStyle = '#fff'; c.fill();
   if (closed < 0.95) {
-    const px = x + n.lx * 0.12, py = EY + n.ly * 0.12;
+    const px = x + n.lx * 0.09, py = EY + n.ly * 0.09;
     if (girl) {
-      c.beginPath(); c.arc(px, py, 0.17, 0, 7); c.fillStyle = '#2f5fc4'; c.fill();
+      c.beginPath(); c.arc(px, py, 0.21, 0, 7); c.fillStyle = '#3a6fd6'; c.fill();
       c.lineWidth = 0.035; c.strokeStyle = '#173478'; c.stroke();
-      c.beginPath(); c.arc(px, py, 0.085, 0, 7); c.fillStyle = '#0b0f1e'; c.fill();
+      c.beginPath(); c.arc(px, py, 0.11, 0, 7); c.fillStyle = '#0b0f1e'; c.fill();
     } else {
-      c.beginPath(); c.arc(px, py, 0.13, 0, 7); c.fillStyle = '#0d0d0d'; c.fill();
+      c.beginPath(); c.arc(px, py, 0.18, 0, 7); c.fillStyle = '#1a1410'; c.fill();
     }
-    c.beginPath(); c.arc(px + 0.05, py - 0.06, 0.045, 0, 7); c.fillStyle = '#fff'; c.fill();
+    c.fillStyle = '#fff'; c.beginPath(); c.arc(px + 0.06, py - 0.07, 0.065, 0, 7); c.fill(); c.beginPath(); c.arc(px - 0.06, py + 0.07, 0.03, 0, 7); c.fill();
   }
   if (closed > 0.02) {
     c.save(); c.beginPath(); c.arc(x, EY, ER, 0, 7); c.clip();
@@ -375,7 +375,7 @@ function eye(c, n, s) {
       c.lineWidth = 0.06; c.strokeStyle = OL; c.stroke();
     }
   }
-  c.beginPath(); c.arc(x, EY, ER, 0, 7); c.lineWidth = 0.065; c.strokeStyle = OL; c.stroke();
+  c.beginPath(); c.arc(x, EY, ER, 0, 7); c.lineWidth = 0.05; c.strokeStyle = OL; c.stroke();
   if (girl) {
     c.lineWidth = 0.085; c.strokeStyle = '#111';
     c.beginPath(); c.moveTo(x + s * 0.22, EY - 0.28); c.quadraticCurveTo(x + s * 0.36, EY - 0.3, x + s * 0.47, EY - 0.42); c.stroke();
@@ -394,13 +394,13 @@ function boyHair(c) {
   const fr = [[0.95, -1.36], [0.7, -1.44], [0.62, -1.3], [0.42, -1.48], [0.26, -1.34], [0.08, -1.5], [-0.12, -1.33], [-0.3, -1.5], [-0.5, -1.32], [-0.66, -1.47], [-0.84, -1.2], [-0.98, -1.25]];
   for (const [x, y] of fr) c.lineTo(x, y);
   c.closePath();
-  c.fillStyle = '#7a4a24'; c.fill(); c.lineWidth = 0.065; c.strokeStyle = '#3a220f'; c.stroke();
+  c.fillStyle = '#7a4a24'; c.fill(); c.lineWidth = 0.055; c.strokeStyle = '#3a220f'; c.stroke();
   c.strokeStyle = '#a3693a'; c.lineWidth = 0.045;
   for (const [x0, y0, x1, y1] of [[-0.55, -1.62, -0.3, -1.85], [-0.15, -1.7, 0.1, -1.92], [0.25, -1.65, 0.48, -1.82], [-0.75, -1.5, -0.62, -1.62]]) { c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); }
 }
 
 function glasses(c) {
-  c.lineWidth = 0.1; c.strokeStyle = '#141414'; c.fillStyle = 'rgba(210,235,255,.13)';
+  c.lineWidth = 0.085; c.strokeStyle = "#141414"; c.fillStyle = 'rgba(210,235,255,.13)';
   for (const s of [-1, 1]) { rr(c, s * EX - 0.4, EY - 0.34, 0.8, 0.68, 0.2); c.fill(); c.stroke(); }
   c.beginPath(); c.moveTo(-0.81, EY - 0.1); c.lineTo(-1.02, EY - 0.04); c.moveTo(0.81, EY - 0.1); c.lineTo(1.02, EY - 0.04); c.stroke();
 }
@@ -413,7 +413,7 @@ function girlBackHair(c) {
   c.quadraticCurveTo(-1.02, -0.22, -1.14, -0.45);
   c.bezierCurveTo(-1.2, -1.3, -0.95, -1.97, 0, -1.97);
   c.closePath();
-  c.fillStyle = '#d9b578'; c.fill(); c.lineWidth = 0.065; c.strokeStyle = '#8a6430'; c.stroke();
+  c.fillStyle = '#d9b578'; c.fill(); c.lineWidth = 0.055; c.strokeStyle = '#8a6430'; c.stroke();
 }
 
 function girlFrontHair(c) {
@@ -426,7 +426,7 @@ function girlFrontHair(c) {
   c.closePath();
   const g = c.createLinearGradient(0, -1.95, 0, -0.3);
   g.addColorStop(0, '#f3d79e'); g.addColorStop(1, '#ddb675');
-  c.fillStyle = g; c.fill(); c.lineWidth = 0.065; c.strokeStyle = '#8a6430'; c.stroke();
+  c.fillStyle = g; c.fill(); c.lineWidth = 0.055; c.strokeStyle = '#8a6430'; c.stroke();
   c.lineWidth = 0.035; c.strokeStyle = '#b8904f';
   for (const [a, b, d, e, f, h] of [[-0.6, -1.4, -0.1, -1.75, 0.45, -1.78], [-0.2, -1.55, 0.3, -1.72, 0.8, -1.5], [0.7, -1.62, 1.0, -1.2, 1.02, -0.5]]) { c.beginPath(); c.moveTo(a, b); c.quadraticCurveTo(d, e, f, h); c.stroke(); }
   c.strokeStyle = '#fbe9c4'; c.lineWidth = 0.045;
@@ -443,9 +443,9 @@ function bow(c) {
 
 function necklace(c) {
   c.lineWidth = 0.032; c.strokeStyle = '#c3c9d2';
-  c.beginPath(); c.moveTo(-0.52, -0.56); c.quadraticCurveTo(-0.15, -0.26, 0.04, -0.27); c.quadraticCurveTo(0.26, -0.3, 0.56, -0.6); c.stroke();
+  c.beginPath(); c.moveTo(-0.6, -0.42); c.quadraticCurveTo(-0.15, -0.12, 0.04, -0.13); c.quadraticCurveTo(0.26, -0.16, 0.62, -0.46); c.stroke();
   c.fillStyle = '#fff'; c.lineWidth = 0.018; c.strokeStyle = '#8f96a0';
-  for (const [x, y] of [[0, -0.055], [0, 0.055], [-0.055, 0], [0.055, 0]]) { c.beginPath(); c.arc(0.04 + x, -0.2 + y, 0.05, 0, 7); c.fill(); c.stroke(); }
+  for (const [x, y] of [[0, -0.055], [0, 0.055], [-0.055, 0], [0.055, 0]]) { c.beginPath(); c.arc(0.04 + x, -0.07 + y, 0.045, 0, 7); c.fill(); c.stroke(); }
 }
 
 function q(t, p0, p1, p2) { const u = 1 - t; return u * u * p0 + 2 * u * t * p1 + t * t * p2; }
@@ -456,19 +456,19 @@ function mouth(c, n, side) {
     c.beginPath(); c.moveTo(side * 0.3 - 0.07, -0.68); c.lineTo(side * 0.3 + 0.07, -0.68); c.lineWidth = 0.03; c.stroke();
     return;
   }
-  const m = n.mouth, L = -0.64, Rx = 0.64, Y = -0.74, CU = -0.47, CL = -0.47 + m * 0.75;
+  const m = n.mouth, L = -0.48, Rx = 0.48, Y = -0.7, CU = -0.5, CL = -0.5 + m * 0.72;
   c.beginPath(); c.moveTo(L, Y); c.quadraticCurveTo(0, CU, Rx, Y); c.quadraticCurveTo(0, CL, L, Y); c.closePath();
   if (m > 0.03) {
-    c.fillStyle = '#5e1019'; c.fill();
+    c.fillStyle = '#a3364d'; c.fill();
     c.save(); c.clip();
-    c.beginPath(); c.ellipse(0, q(0.5, Y, CL, Y) - 0.02, 0.32, 0.17, 0, 0, 7); c.fillStyle = '#e8687c'; c.fill();
+    c.beginPath(); c.ellipse(0, q(0.5, Y, CL, Y) - 0.02, 0.28, 0.17, 0, 0, 7); c.fillStyle = '#ff94a6'; c.fill();
     c.restore();
   }
-  c.lineWidth = 0.07; c.strokeStyle = OL; c.stroke();
-  c.lineWidth = 0.035; c.fillStyle = '#fff';
-  for (const t of [0.17, 0.35, 0.65, 0.83]) {
-    const xa = q(t - 0.065, L, 0, Rx), ya = q(t - 0.065, Y, CU, Y), xb = q(t + 0.065, L, 0, Rx), yb = q(t + 0.065, Y, CU, Y);
-    const xt = q(t, L, 0, Rx), yt = q(t, Y, CU, Y) + 0.17;
+  c.lineWidth = 0.055; c.strokeStyle = OL; c.stroke();
+  c.lineWidth = 0.03; c.fillStyle = '#fff';
+  for (const t of [0.3, 0.7]) {
+    const xa = q(t - 0.07, L, 0, Rx), ya = q(t - 0.07, Y, CU, Y), xb = q(t + 0.07, L, 0, Rx), yb = q(t + 0.07, Y, CU, Y);
+    const xt = q(t, L, 0, Rx), yt = q(t, Y, CU, Y) + 0.1;
     c.beginPath(); c.moveTo(xa, ya); c.lineTo(xt, yt); c.lineTo(xb, yb); c.closePath(); c.fill(); c.stroke();
   }
 }
@@ -491,7 +491,7 @@ function drawNom(n) {
   const stalk = () => { c.beginPath(); c.moveTo(0, 0.05); c.quadraticCurveTo(-0.1, -0.42, 0.12, -0.62); };
   stalk(); c.lineWidth = 0.28; c.strokeStyle = OL; c.stroke();
   stalk(); c.lineWidth = 0.15; c.strokeStyle = GREEN; c.stroke();
-  c.beginPath(); c.ellipse(0.2, -0.68, 0.16, 0.115, -0.6, 0, 7); c.fillStyle = GREEN; c.fill(); c.lineWidth = 0.065; c.strokeStyle = OL; c.stroke();
+  c.beginPath(); c.ellipse(0.2, -0.68, 0.16, 0.115, -0.6, 0, 7); c.fillStyle = GREEN; c.fill(); c.lineWidth = 0.055; c.strokeStyle = OL; c.stroke();
   c.restore();
 
   if (girl) girlBackHair(c);
@@ -504,15 +504,13 @@ function drawNom(n) {
   c.fillStyle = 'rgba(40,90,10,.18)'; c.beginPath(); c.ellipse(0.25, 0.15, 1.1, 0.42, 0, 0, 7); c.fill();
   c.fillStyle = 'rgba(255,255,255,.28)'; c.beginPath(); c.ellipse(-0.55, -1.3, 0.22, 0.13, -0.7, 0, 7); c.fill();
   c.restore();
-  c.lineWidth = 0.075; c.strokeStyle = OL; bodyPath(c); c.stroke();
+  c.lineWidth = 0.06; c.strokeStyle = OL; bodyPath(c); c.stroke();
 
-  for (const s of [-1, 1]) { c.beginPath(); c.ellipse(s * 0.5, -0.02, 0.27, 0.1, 0, 0, 7); c.fillStyle = '#86c434'; c.fill(); c.lineWidth = 0.065; c.stroke(); }
+  for (const s of [-1, 1]) { c.beginPath(); c.ellipse(s * 0.5, -0.02, 0.27, 0.1, 0, 0, 7); c.fillStyle = '#86c434'; c.fill(); c.lineWidth = 0.055; c.stroke(); }
 
-  if (n.kiss > 0) {
-    c.save(); c.globalAlpha = 0.6 * n.kiss; c.fillStyle = '#ff7a98';
-    for (const s of [-1, 1]) { c.beginPath(); c.ellipse(s * 0.66, -0.78, 0.15, 0.08, 0, 0, 7); c.fill(); }
-    c.restore();
-  }
+  c.save(); c.globalAlpha = 0.6 + 0.3 * n.kiss; c.fillStyle = '#ffa6b9';
+  for (const s of [-1, 1]) { c.beginPath(); c.ellipse(s * 0.68, -0.72, 0.15, 0.085, 0, 0, 7); c.fill(); }
+  c.restore();
 
   if (!girl) boyHair(c);
   eye(c, n, -1); eye(c, n, 1);
@@ -572,25 +570,81 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-let AC = null, muted = false;
+let AC = null, master, sfxBus, musBus, noiseBuf, muted = false;
+const mf = m => 440 * Math.pow(2, (m - 69) / 12);
 function unlock() {
-  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
-  if (AC && AC.state === 'suspended') AC.resume();
+  if (!AC) {
+    try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+    master = AC.createGain(); master.gain.value = muted ? 0 : 0.9;
+    const comp = AC.createDynamicsCompressor();
+    master.connect(comp).connect(AC.destination);
+    const len = AC.sampleRate * 1.6, ir = AC.createBuffer(2, len, AC.sampleRate);
+    for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3); }
+    const verb = AC.createConvolver(), wet = AC.createGain();
+    verb.buffer = ir; wet.gain.value = 0.25; verb.connect(wet).connect(master);
+    sfxBus = AC.createGain(); sfxBus.gain.value = 0.8;
+    musBus = AC.createGain(); musBus.gain.value = 0.45;
+    for (const bus of [sfxBus, musBus]) { bus.connect(master); bus.connect(verb); }
+    noiseBuf = AC.createBuffer(1, AC.sampleRate * 0.1, AC.sampleRate);
+    const nd = noiseBuf.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    startMusic();
+  }
+  if (AC.state === 'suspended') AC.resume();
 }
-function tone(f0, f1, dur, type, vol, delay = 0) {
-  if (!AC || muted) return;
-  const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain();
-  o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
-  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  o.connect(g).connect(AC.destination); o.start(t); o.stop(t + dur + 0.03);
+function note(f, t, dur, vol, bus, type = 'sine', bell = 0) {
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(bus); o.start(t); o.stop(t + dur + 0.05);
+  if (bell) {
+    const o2 = AC.createOscillator(), g2 = AC.createGain();
+    o2.frequency.value = f * 4;
+    g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(vol * bell, t + 0.004); g2.gain.exponentialRampToValueAtTime(0.0001, t + dur * 0.3);
+    o2.connect(g2).connect(bus); o2.start(t); o2.stop(t + dur);
+  }
 }
+function glide(f0, f1, t, dur, vol, bus = sfxBus) {
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.7);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(bus); o.start(t); o.stop(t + dur + 0.05);
+}
+function shaker(t, vol) {
+  const src = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+  src.buffer = noiseBuf; f.type = 'highpass'; f.frequency.value = 7000;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+  src.connect(f).connect(g).connect(musBus); src.start(t); src.stop(t + 0.07);
+}
+
+const STEP = 60 / 108 / 2;
+const MEL = [72, 0, 76, 0, 79, 0, 76, 74, 72, 0, 69, 0, 72, 76, 0, 0, 77, 0, 76, 0, 74, 0, 72, 0, 74, 0, 79, 0, 77, 76, 74, 0,
+  76, 0, 79, 81, 79, 0, 76, 0, 72, 0, 76, 0, 79, 0, 0, 0, 77, 76, 74, 0, 72, 0, 69, 0, 71, 0, 74, 0, 72, 0, 0, 0];
+const CHORDS = [[48, 60, 64, 67], [45, 57, 60, 64], [41, 57, 60, 65], [43, 55, 59, 62]];
+let step = 0, nextT = 0;
+function startMusic() {
+  nextT = AC.currentTime + 0.15;
+  setInterval(() => {
+    if (nextT < AC.currentTime - 0.2) nextT = AC.currentTime + 0.05;
+    while (nextT < AC.currentTime + 0.2) { playStep(step, nextT); nextT += STEP; step = (step + 1) % 64; }
+  }, 50);
+}
+function playStep(s, t) {
+  const i = s % 8, ch = CHORDS[(s >> 3) % 4], m = MEL[s];
+  if (m) note(mf(m), t, 0.55, 0.13, musBus, 'triangle', 0.25);
+  if (m && s >= 32) note(mf(m + 12), t, 0.4, 0.035, musBus, 'sine');
+  if (i === 0 || i === 4) note(mf(ch[0]), t, 0.5, 0.22, musBus);
+  if (i === 2 || i === 6) for (let k = 1; k < 4; k++) note(mf(ch[k]), t, 0.35, 0.045, musBus, 'sine', 0.4);
+  shaker(t, i % 2 ? 0.03 : 0.015);
+}
+
+const PENTA = [72, 74, 76, 79, 81, 84];
 const sfx = {
-  am() { tone(560, 260, 0.14, 'triangle', 0.13); tone(320, 180, 0.1, 'square', 0.03, 0.04); },
-  chew() { tone(190, 120, 0.06, 'triangle', 0.06); },
-  land() { tone(150, 300, 0.1, 'sine', 0.035); },
-  jump() { tone(220, 760, 0.25, 'sine', 0.09); },
-  wall() { tone(130, 70, 0.13, 'triangle', 0.12); },
-  kiss() { tone(1400, 900, 0.06, 'sine', 0.1); tone(1650, 1050, 0.07, 'sine', 0.1, 0.1); },
+  am() { if (!AC) return; const t = AC.currentTime; glide(330, 700, t, 0.16, 0.2); note(mf(PENTA[Math.random() * PENTA.length | 0] + 12), t + 0.06, 0.35, 0.05, sfxBus, 'sine', 0.3); },
+  chew() { if (!AC) return; const t = AC.currentTime; glide(240 + Math.random() * 60, 170, t, 0.08, 0.06); },
+  land() { if (!AC) return; glide(220, 330, AC.currentTime, 0.09, 0.03); },
+  jump() { if (!AC) return; const t = AC.currentTime; glide(400, 1050, t, 0.3, 0.12); [76, 79, 84].forEach((m, k) => note(mf(m), t + 0.05 + k * 0.06, 0.3, 0.05, sfxBus, 'sine', 0.3)); },
+  wall() { if (!AC) return; const t = AC.currentTime; note(mf(67), t, 0.22, 0.16, sfxBus, 'sine', 0.5); note(mf(74), t + 0.01, 0.18, 0.06, sfxBus, 'sine'); },
+  kiss() { if (!AC) return; const t = AC.currentTime; glide(700, 1200, t, 0.12, 0.12); [84, 88, 91, 96].forEach((m, k) => note(mf(m), t + 0.14 + k * 0.08, 0.6, 0.06, sfxBus, 'sine', 0.3)); },
 };
 
 let hinted = false;
@@ -608,7 +662,12 @@ cv.addEventListener('pointerdown', e => {
   }
   spawnFood(Math.min(Math.max(x, FS), W - FS), Math.min(y, floorY - FS * 2), -H * 0.25);
 });
-sndBtn.addEventListener('pointerdown', e => { e.stopPropagation(); unlock(); muted = !muted; sndBtn.classList.toggle('off', muted); });
+sndBtn.addEventListener('pointerdown', e => {
+  e.stopPropagation();
+  if (!AC) { unlock(); return; }
+  unlock(); muted = !muted; sndBtn.classList.toggle('off', muted);
+  master.gain.setTargetAtTime(muted ? 0 : 0.9, AC.currentTime, 0.05);
+});
 setTimeout(() => { if (!hinted) hintEl.style.opacity = 0; }, 9000);
 
 addEventListener('resize', resize);
